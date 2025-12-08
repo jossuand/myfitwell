@@ -1,0 +1,12 @@
+do not delete any data from database
+do not update the schema from database
+do not delete any schema from database
+do not run migration
+do not stop database
+do not pause database
+do not restart database
+do not delete database
+do not restore database
+do not run push command on database
+always ask me about updates on database
+do not run start supabase

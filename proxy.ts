@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -29,14 +29,11 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // IMPORTANT: Use getUser() to validate the token, not getSession()
-  // This ensures the token is validated on every request
   const {
     data: { user },
     error: userError,
   } = await supabase.auth.getUser();
 
-  // Protect dashboard routes (exceto debug-auth, debug e test-cookies)
   const isDebugPage =
     request.nextUrl.pathname === "/debug-auth" ||
     request.nextUrl.pathname === "/test-cookies" ||
@@ -44,13 +41,12 @@ export async function middleware(request: NextRequest) {
 
   if (request.nextUrl.pathname.startsWith("/dashboard") && !isDebugPage) {
     if (!user) {
-      // Log para debug apenas em desenvolvimento
       if (process.env.NODE_ENV === "development") {
         const allCookies = request.cookies.getAll();
         const supabaseCookies = allCookies.filter(
           (c) => c.name.includes("supabase") || c.name.includes("sb-")
         );
-        console.log("Middleware: Redirecting to login", {
+        console.log("Proxy: Redirecting to login", {
           pathname: request.nextUrl.pathname,
           hasUser: !!user,
           userError: userError?.message,
@@ -62,7 +58,6 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Redirect authenticated users away from auth pages
   if (
     (request.nextUrl.pathname === "/login" ||
       request.nextUrl.pathname === "/register") &&

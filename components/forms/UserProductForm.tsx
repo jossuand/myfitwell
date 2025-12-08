@@ -55,7 +55,7 @@ export default function UserProductForm({
 
       const productData = {
         user_id: user.id,
-        product_base_id: data.product_base_id,
+        product_base_id: data.product_base_id || null,
         brand: data.brand || null,
         custom_name: data.custom_name || null,
         price: data.price ? parseFloat(data.price) : null,
@@ -104,9 +104,9 @@ export default function UserProductForm({
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="product_base_id">Produto Base *</Label>
-            <Select id="product_base_id" {...register("product_base_id", { required: true })}>
-              <option value="">Selecione...</option>
+            <Label htmlFor="product_base_id">Produto Base (opcional)</Label>
+            <Select id="product_base_id" {...register("product_base_id")}> 
+              <option value="">Sem produto base</option>
               {productBases.map((pb) => (
                 <option key={pb.id} value={pb.id}>
                   {pb.name}
@@ -176,4 +176,3 @@ export default function UserProductForm({
     </Card>
   );
 }
-
