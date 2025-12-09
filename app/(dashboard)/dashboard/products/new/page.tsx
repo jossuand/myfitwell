@@ -14,7 +14,10 @@ export default async function NewUserProductPage() {
 
   const { data: productBases } = await supabase
     .from("product_bases")
-    .select("*")
+    .select(`
+      *,
+      nutritional_info(*)
+    `)
     .eq("is_active", true)
     .order("name");
 
@@ -36,4 +39,3 @@ export default async function NewUserProductPage() {
     </div>
   );
 }
-

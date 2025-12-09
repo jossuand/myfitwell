@@ -19,7 +19,11 @@ export default async function EditUserProductPage(
     .from("user_products")
     .select(`
       *,
-      product_base:product_bases(*)
+      product_base:product_bases(*, nutritional_info(*)),
+      user_nutritional_info:user_product_nutritional_info(
+        *,
+        reference_unit:measurement_units(*)
+      )
     `)
     .eq("id", id)
     .eq("user_id", user.id)
@@ -31,7 +35,10 @@ export default async function EditUserProductPage(
 
   const { data: productBases } = await supabase
     .from("product_bases")
-    .select("*")
+    .select(`
+      *,
+      nutritional_info(*)
+    `)
     .eq("is_active", true)
     .order("name");
 

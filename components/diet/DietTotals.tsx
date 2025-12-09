@@ -170,7 +170,7 @@ export default function DietTotals({ meals, dietId, diet }: DietTotalsProps) {
   if (!meals || meals.length === 0 || trackingNutrients.length === 0) return null;
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-stretch">
       {trackingNutrients.map((key) => {
         const { value, unit } = computeTotalForKey(key);
         const gradient = colorMap[key] || "from-primary to-primary";
@@ -184,16 +184,16 @@ export default function DietTotals({ meals, dietId, diet }: DietTotalsProps) {
         const targetVal = targetKey && diet ? diet[targetKey] : null;
         const diff = targetVal != null ? Number((targetVal - value).toFixed(2)) : null;
         return (
-          <Card key={key} className={`overflow-hidden border-0 bg-gradient-to-br ${gradient} text-white`}>
-            <CardHeader className="p-4">
-              <CardTitle className="text-base font-medium">{labelMap[key]}</CardTitle>
+          <Card key={key} className={`h-full min-h-[110px] overflow-hidden border-0 bg-gradient-to-br ${gradient} text-white`}>
+            <CardHeader className="p-3">
+              <CardTitle className="text-sm font-medium">{labelMap[key]}</CardTitle>
             </CardHeader>
-            <CardContent className="p-4 pt-0">
-              <div className="text-3xl font-bold">
+            <CardContent className="p-3 pt-0">
+              <div className="text-2xl font-bold">
                 {value} {unit}
               </div>
               {targetVal != null && (
-                <div className="mt-2 text-sm opacity-90">
+                <div className="mt-1 text-xs opacity-90">
                   Meta: {unit === "kcal" ? Math.round(targetVal) : Number((targetVal as number).toFixed(2))} {unit}
                   {diff != null && (
                     <span className="ml-2">

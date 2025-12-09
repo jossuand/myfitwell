@@ -24,6 +24,7 @@ const clientNavItems = [
   { href: "/dashboard/profile", label: "Perfil", icon: User },
   { href: "/dashboard/addresses", label: "Endereços", icon: MapPin },
   { href: "/dashboard/products", label: "Meus Produtos", icon: Package },
+  { href: "/dashboard/base-products", label: "Produtos Base", icon: Package },
   { href: "/dashboard/diets", label: "Dietas", icon: UtensilsCrossed },
   { href: "/dashboard/inventory", label: "Estoque", icon: Warehouse },
   { href: "/dashboard/shopping-lists", label: "Lista de Compras", icon: ShoppingCart },
@@ -89,4 +90,3 @@ export default function Sidebar() {
     </div>
   );
 }
-

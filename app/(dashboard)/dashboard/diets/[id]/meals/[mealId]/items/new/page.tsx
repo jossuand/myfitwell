@@ -47,7 +47,11 @@ export default async function NewDietItemPage(
     .from("user_products")
     .select(`
       *,
-      product_base:product_bases(*)
+      product_base:product_bases(*),
+      user_nutritional_info:user_product_nutritional_info(
+        *,
+        reference_unit:measurement_units(*)
+      )
     `)
     .eq("user_id", user.id);
 
@@ -75,4 +79,3 @@ export default async function NewDietItemPage(
     </div>
   );
 }
-

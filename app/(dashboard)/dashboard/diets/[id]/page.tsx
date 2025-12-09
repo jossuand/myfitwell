@@ -48,6 +48,10 @@ export default async function DietDetailPage(
             *,
             measurement_unit:measurement_units(*),
             nutritional_info(*)
+          ),
+          user_nutritional_info:user_product_nutritional_info(
+            *,
+            reference_unit:measurement_units(*)
           )
         ),
         measurement_unit:measurement_units(*)
@@ -86,9 +90,6 @@ export default async function DietDetailPage(
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{diet.name}</h1>
-          <p className="text-muted-foreground">
-            Calorias: {Math.round(totals.calories)} kcal • Peso: {Math.round(totals.weight_g)} g
-          </p>
           <div className="mt-4">
             <DietTotals meals={meals || []} dietId={id} diet={diet} />
           </div>

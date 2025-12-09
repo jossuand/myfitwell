@@ -1,9 +1,14 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import BaseProductsCatalog from "@/components/catalog/BaseProductsCatalog";
 
-export default async function BaseProductsCatalogPage() {
+export default async function BaseProductsCatalogPage(
+  props: { searchParams?: Promise<{ q?: string }> }
+) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -13,7 +18,20 @@ export default async function BaseProductsCatalogPage() {
     redirect("/login");
   }
 
-  const { data: products } = await supabase
+  const { data: roles } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("is_active", true);
+
+  const isAdmin = roles?.some((r) => r.role === "admin");
+
+  if (isAdmin) {
+    redirect("/dashboard/admin/products");
+  }
+
+  const { q } = (await props.searchParams) || {};
+  let query = supabase
     .from("product_bases")
     .select(`
       *,
@@ -23,6 +41,25 @@ export default async function BaseProductsCatalogPage() {
     `)
     .eq("is_active", true)
     .order("name");
+  if (q && q.trim().length > 0) {
+    query = query.ilike("name", `%${q}%`);
+  }
+  const { data: products } = await query;
+  const ids = (products || []).map((p: any) => p.id);
+  let productsWithNutrition = products || [];
+  if (ids.length > 0) {
+    const { data: nutritionRows } = await supabase
+      .from("nutritional_info")
+      .select("*")
+      .in("product_base_id", ids);
+    const nmap = Object.fromEntries(
+      (nutritionRows || []).map((row: any) => [row.product_base_id, row])
+    );
+    productsWithNutrition = (products || []).map((p: any) => ({
+      ...p,
+      nutritional_info: nmap[p.id] || p.nutritional_info || null,
+    }));
+  }
 
   return (
     <div className="space-y-6">
@@ -30,60 +67,7 @@ export default async function BaseProductsCatalogPage() {
         <h1 className="text-3xl font-bold tracking-tight">Produtos Base</h1>
         <p className="text-muted-foreground">Visualize informações nutricionais por 100g/unidade</p>
       </div>
-
-      {products && products.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {products.map((product: any) => (
-            <Card key={product.id}>
-              <CardHeader>
-                <CardTitle className="text-lg">{product.name}</CardTitle>
-                {product.category && (
-                  <CardDescription>
-                    <Badge variant="secondary">{product.category.name}</Badge>
-                  </CardDescription>
-                )}
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {product.description && (
-                  <p className="text-sm text-muted-foreground">{product.description}</p>
-                )}
-                {product.measurement_unit && (
-                  <p className="text-sm">Unidade: {product.measurement_unit.abbreviation}</p>
-                )}
-                {product.nutritional_info ? (
-                  <div className="text-sm">
-                    <p className="font-medium">Informações Nutricionais (por 100 {product.measurement_unit?.abbreviation || "g"}):</p>
-                    <ul className="mt-1 space-y-1 text-muted-foreground">
-                      <li>Calorias: {product.nutritional_info.calories ?? 0} kcal</li>
-                      <li>Proteínas: {product.nutritional_info.protein ?? 0} g</li>
-                      <li>Carboidratos: {product.nutritional_info.carbohydrates ?? 0} g</li>
-                      <li>Gorduras Totais: {product.nutritional_info.total_fat ?? 0} g</li>
-                      {product.nutritional_info.fiber != null && (
-                        <li>Fibras: {product.nutritional_info.fiber} g</li>
-                      )}
-                      {product.nutritional_info.sodium != null && (
-                        <li>Sódio: {product.nutritional_info.sodium} mg</li>
-                      )}
-                    </ul>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Sem informações nutricionais</p>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Nenhum produto base ativo</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">Cadastre produtos base na área administrativa.</p>
-          </CardContent>
-        </Card>
-      )}
+      <BaseProductsCatalog products={productsWithNutrition} defaultQuery={q || ""} />
     </div>
   );
 }
-

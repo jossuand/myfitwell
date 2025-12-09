@@ -66,7 +66,14 @@ export default function MealList({ meals, dietId }: MealListProps) {
         supabase.from("product_bases").select("*", { count: "exact" }).eq("is_active", true).order("name"),
         supabase
           .from("user_products")
-          .select("*, product_base:product_bases(*)")
+          .select(`
+            *,
+            product_base:product_bases(*),
+            user_nutritional_info:user_product_nutritional_info(
+              *,
+              reference_unit:measurement_units(*)
+            )
+          `)
           .eq("user_id", user.id),
         supabase.from("measurement_units").select("*", { count: "exact" }).eq("is_active", true).order("name"),
       ]);
@@ -104,44 +111,86 @@ export default function MealList({ meals, dietId }: MealListProps) {
   }
 
   const computeItemCalories = (item: any) => {
-    const unit = item?.measurement_unit?.abbreviation;
+    const qtyUnit = item?.measurement_unit?.abbreviation;
     const qty = typeof item?.quantity === "number" ? item.quantity : 0;
+    const userNI = item?.user_product?.user_nutritional_info;
+    if (userNI) {
+      const refQty = typeof userNI?.reference_quantity === "number" ? userNI.reference_quantity : 100;
+      const refUnit = userNI?.reference_unit?.abbreviation || "g";
+      const val = Number(userNI?.calories) || 0;
+      if (refUnit === "g") {
+        const grams = qtyUnit === "g" ? qty : qtyUnit === "kg" ? qty * 1000 : 0;
+        return grams > 0 ? (val / refQty) * grams : 0;
+      }
+      if (refUnit && qtyUnit && refUnit === qtyUnit) {
+        return (val * qty) / refQty;
+      }
+      return 0;
+    }
     const base = item?.product_base || item?.user_product?.product_base;
-    const baseCalories = base?.nutritional_info?.calories || 0;
+    const baseCalories = Number(base?.nutritional_info?.calories) || 0;
     const baseUnit = base?.measurement_unit?.abbreviation;
     if (baseUnit === "g") {
       const perGram = baseCalories / 100;
-      const grams = unit === "g" ? qty : unit === "kg" ? qty * 1000 : 0;
+      const grams = qtyUnit === "g" ? qty : qtyUnit === "kg" ? qty * 1000 : 0;
       return perGram * grams;
     }
-    if (baseUnit && unit && baseUnit === unit) {
+    if (baseUnit && qtyUnit && baseUnit === qtyUnit) {
       return baseCalories * qty;
     }
     return 0;
   };
 
   const computeItemMacro = (item: any, key: "carbohydrates" | "protein" | "total_fat") => {
-    const unit = item?.measurement_unit?.abbreviation;
+    const qtyUnit = item?.measurement_unit?.abbreviation;
     const qty = typeof item?.quantity === "number" ? item.quantity : 0;
+    const userNI = item?.user_product?.user_nutritional_info;
+    if (userNI) {
+      const refQty = typeof userNI?.reference_quantity === "number" ? userNI.reference_quantity : 100;
+      const refUnit = userNI?.reference_unit?.abbreviation || "g";
+      const val = Number(userNI?.[key]) || 0;
+      if (refUnit === "g") {
+        const grams = qtyUnit === "g" ? qty : qtyUnit === "kg" ? qty * 1000 : 0;
+        return grams > 0 ? (val / refQty) * grams : 0;
+      }
+      if (refUnit && qtyUnit && refUnit === qtyUnit) {
+        return (val * qty) / refQty;
+      }
+      return 0;
+    }
     const base = item?.product_base || item?.user_product?.product_base;
-    const baseVal = base?.nutritional_info?.[key] || 0;
+    const baseVal = Number(base?.nutritional_info?.[key]) || 0;
     const baseUnit = base?.measurement_unit?.abbreviation;
     if (baseUnit === "g") {
       const perGram = baseVal / 100;
-      const grams = unit === "g" ? qty : unit === "kg" ? qty * 1000 : 0;
+      const grams = qtyUnit === "g" ? qty : qtyUnit === "kg" ? qty * 1000 : 0;
       return perGram * grams;
     }
-    if (baseUnit && unit && baseUnit === unit) {
+    if (baseUnit && qtyUnit && baseUnit === qtyUnit) {
       return baseVal * qty;
     }
     return 0;
   };
 
-  const computeItemNutrient = (item: any, key: string, unit: "g" | "mg" | "mcg") => {
+  const computeItemNutrient = (item: any, key: string, _unit: "g" | "mg" | "mcg") => {
     const qtyUnit = item?.measurement_unit?.abbreviation;
     const qty = typeof item?.quantity === "number" ? item.quantity : 0;
+    const userNI = item?.user_product?.user_nutritional_info;
+    if (userNI) {
+      const refQty = typeof userNI?.reference_quantity === "number" ? userNI.reference_quantity : 100;
+      const refUnit = userNI?.reference_unit?.abbreviation || "g";
+      const val = Number(userNI?.[key]) || 0;
+      if (refUnit === "g") {
+        const grams = qtyUnit === "g" ? qty : qtyUnit === "kg" ? qty * 1000 : 0;
+        return grams > 0 ? (val / refQty) * grams : 0;
+      }
+      if (refUnit && qtyUnit && refUnit === qtyUnit) {
+        return (val * qty) / refQty;
+      }
+      return 0;
+    }
     const base = item?.product_base || item?.user_product?.product_base;
-    const baseVal = base?.nutritional_info?.[key] || 0;
+    const baseVal = Number(base?.nutritional_info?.[key]) || 0;
     const baseUnit = base?.measurement_unit?.abbreviation;
     if (baseUnit === "g") {
       const perGram = baseVal / 100;
