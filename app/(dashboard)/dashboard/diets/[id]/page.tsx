@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import MealList from "@/components/diet/MealList";
+import DietTotals from "@/components/diet/DietTotals";
 
 export default async function DietDetailPage(
   props: { params: Promise<{ id: string }> }
@@ -88,7 +89,13 @@ export default async function DietDetailPage(
           <p className="text-muted-foreground">
             Calorias: {Math.round(totals.calories)} kcal • Peso: {Math.round(totals.weight_g)} g
           </p>
+          <div className="mt-4">
+            <DietTotals meals={meals || []} dietId={id} diet={diet} />
+          </div>
         </div>
+      </div>
+
+      <div className="flex justify-end">
         <Button asChild>
           <Link href={`/dashboard/diets/${id}/meals/new`}>
             <Plus className="mr-2 h-4 w-4" />

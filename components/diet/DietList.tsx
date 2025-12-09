@@ -54,7 +54,7 @@ export default function DietList({ diets }: DietListProps) {
                 <UtensilsCrossed className="h-5 w-5 text-primary" />
                 <CardTitle className="text-lg">{diet.name}</CardTitle>
               </div>
-              {diet.is_active && <Badge>Ativa</Badge>}
+              {diet.is_active ? <Badge>Ativa</Badge> : <Badge variant="secondary">Inativa</Badge>}
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -89,4 +89,3 @@ export default function DietList({ diets }: DietListProps) {
     </div>
   );
 }
-
