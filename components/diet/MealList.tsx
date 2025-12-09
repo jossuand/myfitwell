@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { UtensilsCrossed, Edit, Trash2 } from "lucide-react";
+import { UtensilsCrossed, Edit, Trash2, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -48,6 +48,12 @@ export default function MealList({ meals, dietId }: MealListProps) {
   const [notesByMeal, setNotesByMeal] = React.useState<Record<string, string>>({});
   const [openDetailsByItem, setOpenDetailsByItem] = React.useState<Record<string, boolean>>({});
   const [trackingNutrients, setTrackingNutrients] = React.useState<string[]>(["calories", "carbohydrates", "protein"]);
+  const [openEditByItem, setOpenEditByItem] = React.useState<Record<string, boolean>>({});
+  const [editSearchTermByItem, setEditSearchTermByItem] = React.useState<Record<string, string>>({});
+  const [editChoiceByItem, setEditChoiceByItem] = React.useState<Record<string, { kind: "base" | "user"; id: string } | null>>({});
+  const [editUnitIdByItem, setEditUnitIdByItem] = React.useState<Record<string, string>>({});
+  const [editQtyByItem, setEditQtyByItem] = React.useState<Record<string, string>>({});
+  const [editNotesByItem, setEditNotesByItem] = React.useState<Record<string, string>>({});
 
   React.useEffect(() => {
     let mounted = true;
@@ -131,7 +137,7 @@ export default function MealList({ meals, dietId }: MealListProps) {
     return 0;
   };
 
-  const computeItemNutrient = (item: any, key: string, unit: "g" | "mg") => {
+  const computeItemNutrient = (item: any, key: string, unit: "g" | "mg" | "mcg") => {
     const qtyUnit = item?.measurement_unit?.abbreviation;
     const qty = typeof item?.quantity === "number" ? item.quantity : 0;
     const base = item?.product_base || item?.user_product?.product_base;
@@ -140,7 +146,7 @@ export default function MealList({ meals, dietId }: MealListProps) {
     if (baseUnit === "g") {
       const perGram = baseVal / 100;
       const grams = qtyUnit === "g" ? qty : qtyUnit === "kg" ? qty * 1000 : 0;
-      return unit === "mg" ? perGram * grams : perGram * grams;
+      return perGram * grams;
     }
     if (baseUnit && qtyUnit && baseUnit === qtyUnit) {
       return baseVal * qty;
@@ -291,35 +297,205 @@ export default function MealList({ meals, dietId }: MealListProps) {
                           <td className="p-2">{Number(computeItemMacro(item, "carbohydrates").toFixed(2))} g</td>
                           <td className="p-2">{Number(computeItemMacro(item, "protein").toFixed(2))} g</td>
                           <td className="p-2">
-                            <div className="flex items-center gap-2">
-                              <Button asChild size="sm" variant="ghost">
-                                <Link href={`/dashboard/diets/${dietId}/meals/${meal.id}/items/${item.id}/edit`}>
-                                  <Edit className="h-4 w-4" />
-                                </Link>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                title="Editar"
+                                aria-label="Editar"
+                                onClick={() => {
+                                  setOpenEditByItem((prev) => ({ ...prev, [item.id]: !prev[item.id] }));
+                                  if (!openEditByItem[item.id]) {
+                                    const label = item.product_base?.name || item.user_product?.custom_name || item.user_product?.product_base?.name || "";
+                                    const choice = item.product_base?.id
+                                      ? { kind: "base" as const, id: item.product_base.id as string }
+                                      : item.user_product?.id
+                                      ? { kind: "user" as const, id: item.user_product.id as string }
+                                      : null;
+                                    setEditSearchTermByItem((p) => ({ ...p, [item.id]: label }));
+                                    setEditChoiceByItem((p) => ({ ...p, [item.id]: choice }));
+                                    setEditQtyByItem((p) => ({ ...p, [item.id]: typeof item.quantity === "number" ? String(item.quantity) : "" }));
+                                    setEditUnitIdByItem((p) => ({ ...p, [item.id]: item.measurement_unit?.id || "" }));
+                                    setEditNotesByItem((p) => ({ ...p, [item.id]: item.preparation_notes || "" }));
+                                  }
+                                }}
+                              className="px-1"
+                              >
+                                <Edit className="h-4 w-4" />
                               </Button>
                               <Button
                                 size="sm"
                                 variant="ghost"
+                                title="Excluir"
+                                aria-label="Excluir"
                                 onClick={async () => {
                                   if (!confirm("Remover este item?")) return;
                                   await supabase.from("diet_items").delete().eq("id", item.id);
                                   router.refresh();
                                 }}
+                              className="px-1"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                               <Button
                                 size="sm"
-                                variant="outline"
+                                variant="ghost"
+                                title="Nutrientes"
+                                aria-label="Nutrientes"
                                 onClick={() =>
                                   setOpenDetailsByItem((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
                                 }
+                              className="px-1"
                               >
-                                Nutrientes
+                                <FlaskConical className="h-4 w-4" />
                               </Button>
                             </div>
                           </td>
                         </tr>
+                        {openEditByItem[item.id] ? (
+                          <tr className="border-t bg-muted/30">
+                            <td className="p-2 align-top">
+                              <div className="space-y-2">
+                                <Input
+                                  placeholder="Buscar produto..."
+                                  value={editSearchTermByItem[item.id] || ""}
+                                  onChange={(e) =>
+                                    setEditSearchTermByItem((prev) => ({ ...prev, [item.id]: e.target.value }))
+                                  }
+                                />
+                                {(() => {
+                                  const term = (editSearchTermByItem[item.id] || "").toLowerCase();
+                                  const choice = editChoiceByItem[item.id];
+                                  const options = [
+                                    ...productBases.map((pb) => ({
+                                      kind: "base" as const,
+                                      id: pb.id as string,
+                                      label: pb.name as string,
+                                    })),
+                                    ...userProducts.map((up) => ({
+                                      kind: "user" as const,
+                                      id: up.id as string,
+                                      label: (up.custom_name || up.product_base?.name || up.id) as string,
+                                    })),
+                                  ].filter((o) => o.label.toLowerCase().includes(term));
+                                  return choice || term.trim().length === 0 ? null : (
+                                    <div className="max-h-40 overflow-auto rounded border bg-background">
+                                      {options.length > 0 ? (
+                                        options.slice(0, 50).map((o) => (
+                                          <button
+                                            key={`${o.kind}:${o.id}`}
+                                            className="flex w-full cursor-pointer items-center justify-between px-2 py-1 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                                            onClick={() => {
+                                              setEditChoiceByItem((prev) => ({ ...prev, [item.id]: { kind: o.kind, id: o.id } }));
+                                              setEditSearchTermByItem((prev) => ({ ...prev, [item.id]: o.label }));
+                                            }}
+                                          >
+                                            <span>{o.label}</span>
+                                          </button>
+                                        ))
+                                      ) : (
+                                        <div className="px-2 py-1 text-sm text-muted-foreground">Nenhum resultado</div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            </td>
+                            <td className="p-2 align-top">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="Qtd"
+                                value={editQtyByItem[item.id] || ""}
+                                onChange={(e) => setEditQtyByItem((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                              />
+                            </td>
+                            <td className="p-2 align-top">
+                              <Select
+                                value={editUnitIdByItem[item.id] || ""}
+                                onChange={(e) => setEditUnitIdByItem((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                              >
+                                <option value="">Selecione...</option>
+                                {units.map((u) => (
+                                  <option key={u.id} value={u.id}>
+                                    {u.abbreviation}
+                                  </option>
+                                ))}
+                              </Select>
+                            </td>
+                            <td className="p-2 align-top">
+                              <Input
+                                placeholder="Observações"
+                                value={editNotesByItem[item.id] || ""}
+                                onChange={(e) => setEditNotesByItem((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                              />
+                            </td>
+                            <td className="p-2 align-top">
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={async () => {
+                                    const choice = editChoiceByItem[item.id];
+                                    const quantity = editQtyByItem[item.id];
+                                    const unitId = editUnitIdByItem[item.id];
+                                    if (!choice) {
+                                      alert("Selecione um produto");
+                                      return;
+                                    }
+                                    if (!unitId) {
+                                      alert("Selecione a unidade");
+                                      return;
+                                    }
+                                    if (!quantity || isNaN(Number(quantity))) {
+                                      alert("Informe a quantidade");
+                                      return;
+                                    }
+                                    const product_base_id = choice.kind === "base" ? choice.id : null;
+                                    const user_product_id = choice.kind === "user" ? choice.id : null;
+                                    const { error: updateError } = await supabase
+                                      .from("diet_items")
+                                      .update({
+                                        product_base_id,
+                                        user_product_id,
+                                        measurement_unit_id: unitId,
+                                        quantity: parseFloat(quantity),
+                                        preparation_notes: (editNotesByItem[item.id] || null) as any,
+                                      })
+                                      .eq("id", item.id);
+                                    if (updateError) {
+                                      alert(updateError.message);
+                                      return;
+                                    }
+                                    setOpenEditByItem((prev) => ({ ...prev, [item.id]: false }));
+                                    setEditChoiceByItem((prev) => ({ ...prev, [item.id]: null }));
+                                    setEditQtyByItem((prev) => ({ ...prev, [item.id]: "" }));
+                                    setEditUnitIdByItem((prev) => ({ ...prev, [item.id]: "" }));
+                                    setEditNotesByItem((prev) => ({ ...prev, [item.id]: "" }));
+                                    router.refresh();
+                                  }}
+                                >
+                                  Salvar
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setOpenEditByItem((prev) => ({ ...prev, [item.id]: false }));
+                                  }}
+                                >
+                                  Cancelar
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : null}
+                        {item.preparation_notes ? (
+                          <tr className="bg-muted/20">
+                            <td className="p-2 text-sm text-muted-foreground" colSpan={7}>
+                              <span className="font-medium">Observações do preparo:</span> {item.preparation_notes}
+                            </td>
+                          </tr>
+                        ) : null}
                         {openDetailsByItem[item.id] ? (
                           <tr className="bg-muted/20">
                             <td className="p-2" colSpan={7}>
@@ -379,7 +555,7 @@ export default function MealList({ meals, dietId }: MealListProps) {
                                     label: (up.custom_name || up.product_base?.name || up.id) as string,
                                   })),
                                 ].filter((o) => o.label.toLowerCase().includes(term));
-                                return choice ? null : (
+                                return choice || term.trim().length === 0 ? null : (
                                   <div className="max-h-40 overflow-auto rounded border bg-background">
                                     {options.length > 0 ? (
                                       options.slice(0, 50).map((o) => (
@@ -527,7 +703,7 @@ export default function MealList({ meals, dietId }: MealListProps) {
                                   ...productBases.map((pb) => ({ kind: "base" as const, id: pb.id as string, label: pb.name as string })),
                                   ...userProducts.map((up) => ({ kind: "user" as const, id: up.id as string, label: (up.custom_name || up.product_base?.name || up.id) as string })),
                                 ].filter((o) => o.label.toLowerCase().includes(term));
-                                return choice ? null : (
+                                return choice || term.trim().length === 0 ? null : (
                                   <div className="max-h-40 overflow-auto rounded border bg-background">
                                     {options.length > 0 ? (
                                       options.slice(0, 50).map((o) => (

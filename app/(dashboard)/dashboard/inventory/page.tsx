@@ -37,16 +37,9 @@ export default async function InventoryPage() {
             Gerencie o estoque dos seus produtos
           </p>
         </div>
-        <Button asChild>
-          <Link href="/dashboard/inventory/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Adicionar ao Estoque
-          </Link>
-        </Button>
       </div>
 
       <InventoryList inventory={inventory || []} />
     </div>
   );
 }
-
