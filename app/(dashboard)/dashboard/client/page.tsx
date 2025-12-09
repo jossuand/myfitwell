@@ -1,8 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { UtensilsCrossed, ShoppingCart, TrendingUp, Package } from "lucide-react";
+import { UtensilsCrossed, ShoppingCart, Target, CalendarDays, ChevronRight } from "lucide-react";
+
 
 export default async function ClientDashboardPage() {
   const supabase = await createClient();
@@ -29,134 +31,167 @@ export default async function ClientDashboardPage() {
     .eq("is_active", true)
     .single();
 
-  // Contar itens na lista de compras
-  const { count: shoppingListCount } = await supabase
+    let meals: any[] = [];
+  if (activeDiet) {
+    const { data: dietMeals } = await supabase
+      .from("meals")
+      .select(`
+        *,
+        diet_items(
+          *,
+          product_base:product_bases(
+            *,
+            measurement_unit:measurement_units(*),
+            nutritional_info(*)
+          ),
+          user_product:user_products(
+            *,
+            product_base:product_bases(
+              *,
+              measurement_unit:measurement_units(*),
+              nutritional_info(*)
+            ),
+            user_nutritional_info:user_product_nutritional_info(
+              *,
+              reference_unit:measurement_units(*)
+            )
+          ),
+          measurement_unit:measurement_units(*)
+        )
+      `)
+      .eq("diet_id", activeDiet.id)
+      .order("meal_order");
+    meals = dietMeals || [];
+  }
+
+  const { data: shoppingLists } = await supabase
     .from("shopping_lists")
-    .select("*", { count: "exact", head: true })
+    .select(`
+      *,
+      shopping_list_items(
+        *,
+        product_base:product_bases(*),
+        user_product:user_products(*),
+        measurement_unit:measurement_units(*)
+      )
+    `)
     .eq("user_id", user.id)
-    .eq("is_completed", false);
+    .eq("is_completed", false)
+    .order("created_at", { ascending: false });
+
+  const pendingList = (shoppingLists || [])[0] || null;
+  const pendingItems = pendingList
+    ? (pendingList.shopping_list_items || []).filter((it: any) => !it.is_purchased)
+    : [];
+
+  const todayLabel = new Intl.DateTimeFormat("pt-BR", { weekday: "long" }).format(new Date());
+  const mealLabels: Record<string, string> = {
+    breakfast: "Café da Manhã",
+    morning_snack: "Lanche da Manhã",
+    lunch: "Almoço",
+    afternoon_snack: "Lanche da Tarde",
+    dinner: "Jantar",
+    supper: "Ceia",
+    pre_workout: "Pré-Treino",
+    post_workout: "Pós-Treino",
+  };
+  const targetCalories = activeDiet?.target_calories != null ? Number(activeDiet.target_calories) : null;
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Bem-vindo, {profile?.full_name || "Usuário"}!
-        </h1>
-        <p className="text-muted-foreground">
-          Gerencie suas dietas, estoque e compras em um só lugar
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">Olá, {profile?.full_name || "Usuário"}!</h1>
+        <p className="text-muted-foreground">Seu dia em foco</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Dieta Atual</CardTitle>
-            <UtensilsCrossed className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {activeDiet ? activeDiet.name : "Nenhuma"}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="overflow-hidden">
+          <CardHeader className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="rounded-md bg-orange-100 p-2 text-orange-600">
+                  <UtensilsCrossed className="h-4 w-4" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Dieta de hoje</CardTitle>
+                  <CardDescription className="flex items-center gap-2">
+                    <CalendarDays className="h-3 w-3" />
+                    {todayLabel.charAt(0).toUpperCase() + todayLabel.slice(1)}
+                  </CardDescription>
+                </div>
+              </div>
+              {targetCalories != null && (
+                <Badge variant="secondary" className="font-medium">Meta: {Math.round(targetCalories)} kcal</Badge>
+              )}
             </div>
-            <p className="text-xs text-muted-foreground">
-              {activeDiet
-                ? `Objetivo: ${activeDiet.objective}`
-                : "Crie sua primeira dieta"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Peso Atual</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {profile?.weight ? `${profile.weight} kg` : "Não informado"}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              IMC: {profile?.imc ? profile.imc.toFixed(1) : "N/A"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Lista de Compras</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {shoppingListCount || 0}
-            </div>
-            <p className="text-xs text-muted-foreground">Listas ativas</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Meus Produtos</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">-</div>
-            <p className="text-xs text-muted-foreground">Em breve</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Ações Rápidas</CardTitle>
-            <CardDescription>
-              Acesse rapidamente as funcionalidades principais
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Button asChild className="w-full justify-start">
-              <Link href="/dashboard/diets/new">
-                <UtensilsCrossed className="mr-2 h-4 w-4" />
-                Criar Nova Dieta
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="w-full justify-start">
-              <Link href="/dashboard/shopping-lists">
-                <ShoppingCart className="mr-2 h-4 w-4" />
-                Ver Lista de Compras
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="w-full justify-start">
-              <Link href="/dashboard/inventory">
-                <Package className="mr-2 h-4 w-4" />
-                Gerenciar Estoque
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Próximos Passos</CardTitle>
-            <CardDescription>
-              Complete seu perfil para uma experiência personalizada
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {!profile?.weight && (
-              <p className="text-sm text-muted-foreground">
-                • Adicione seu peso e altura no perfil
-              </p>
+            {activeDiet ? (
+              <>
+                {meals.length > 0 ? (
+                  meals.map((meal) => (
+                    <div key={meal.id} className="mt-3 rounded-lg border p-3">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium">{meal.name || mealLabels[meal.meal_type] || meal.meal_type}</p>
+                        <Badge variant="outline" className="text-xs">{(meal.diet_items || []).length} itens</Badge>
+                      </div>
+                      <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                        {(meal.diet_items || []).map((item: any) => (
+                          <li key={item.id} className="flex items-center gap-2">
+                            <ChevronRight className="h-3 w-3" />
+                            <span>
+                              {item.quantity} {item.measurement_unit?.abbreviation || ""} • {item.product_base?.name || item.user_product?.custom_name || item.user_product?.product_base?.name || "Produto"}
+                              {item.preparation_notes ? ` (${item.preparation_notes})` : ""}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">Sem refeições nesta dieta</p>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">Nenhuma dieta ativa</p>
             )}
-            {!activeDiet && (
-              <p className="text-sm text-muted-foreground">
-                • Crie sua primeira dieta
-              </p>
-            )}
-            {shoppingListCount === 0 && (
-              <p className="text-sm text-muted-foreground">
-                • Gere uma lista de compras baseada na sua dieta
-              </p>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden">
+          <CardHeader className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="rounded-md bg-sky-100 p-2 text-sky-600">
+                  <ShoppingCart className="h-4 w-4" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Lista de compras pendente</CardTitle>
+                  <CardDescription>{pendingList ? pendingList.name : "Nenhuma lista pendente"}</CardDescription>
+                </div>
+              </div>
+              <Badge variant="secondary" className="font-medium">{pendingItems.length} itens</Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {pendingList ? (
+              <>
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  {pendingItems.length > 0 ? pendingItems.map((it: any) => (
+                    <li key={it.id} className="flex items-center gap-2">
+                      <ChevronRight className="h-3 w-3" />
+                      <span>{it.quantity} {it.measurement_unit?.abbreviation || ""} • {it.product_base?.name || it.user_product?.custom_name || it.user_product?.product_base?.name || "Produto"}</span>
+                    </li>
+                  )) : <p>Nenhum item pendente</p>}
+                </ul>
+                <div className="mt-3">
+                  <Button asChild variant="outline">
+                    <Link href="/dashboard/shopping-lists">Ver todas as listas</Link>
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="text-sm text-muted-foreground">Nenhuma lista de compras pendente</div>
             )}
           </CardContent>
         </Card>
@@ -164,4 +199,3 @@ export default async function ClientDashboardPage() {
     </div>
   );
 }
-
