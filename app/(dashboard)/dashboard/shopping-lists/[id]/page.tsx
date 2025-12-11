@@ -1,0 +1,163 @@
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
+import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { DebugButton } from "@/components/shopping/DebugButton";
+import { ShoppingListItems } from "@/components/shopping/ShoppingListItems";
+
+interface ShoppingListPageProps {
+  params: Promise<{ id: string }>;
+}
+
+export default async function ShoppingListPage({ params }: ShoppingListPageProps) {
+  const { id } = await params;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  // Validar se o ID foi passado
+  if (!id) {
+    console.error("ID da lista não foi fornecido nos parâmetros da rota");
+
+    // Em vez de redirect, vamos renderizar uma página de erro
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-destructive">Erro</h1>
+            <p className="text-muted-foreground">
+              ID da lista não foi fornecido ou é inválido.
+            </p>
+          </div>
+        </div>
+
+        <div className="max-w-2xl">
+          <div className="bg-muted p-4 rounded-lg">
+            <p className="text-sm text-muted-foreground mb-4">
+              Isso pode acontecer se:
+            </p>
+            <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+              <li>O link foi acessado incorretamente</li>
+              <li>A lista foi excluída</li>
+              <li>Houve um problema na geração do link</li>
+            </ul>
+          </div>
+
+          <div className="mt-6">
+            <Button asChild>
+              <Link href="/dashboard/shopping-lists">
+                Voltar para Listas de Compras
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Buscar a lista de compras específica
+  const { data: shoppingList, error: listError } = await supabase
+    .from("shopping_lists")
+    .select(`
+      *,
+      shopping_list_items(
+        *,
+        product_base:product_bases(id, name),
+        user_product:user_products(id, custom_name),
+        measurement_unit:measurement_units(id, abbreviation)
+      )
+    `)
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .single();
+
+  if (listError || !shoppingList) {
+    console.error("Erro ao buscar lista:", listError);
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-destructive">Lista não encontrada</h1>
+            <p className="text-muted-foreground">
+              A lista de compras que você está procurando não existe ou foi excluída.
+            </p>
+          </div>
+        </div>
+
+        <div className="max-w-2xl">
+          <div className="bg-muted p-4 rounded-lg">
+            <p className="text-sm text-muted-foreground">
+              Verifique se o link está correto ou se a lista ainda existe.
+            </p>
+          </div>
+
+          <div className="mt-6">
+            <Button asChild>
+              <Link href="/dashboard/shopping-lists">
+                Voltar para Listas de Compras
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const totalItems = shoppingList.shopping_list_items?.length || 0;
+  const purchasedItems = shoppingList.shopping_list_items?.filter((item: any) => item.is_purchased).length || 0;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/dashboard/shopping-lists">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Voltar
+            </Link>
+          </Button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold tracking-tight">{shoppingList.name}</h1>
+            </div>
+            <p className="text-muted-foreground">
+              {purchasedItems} de {totalItems} itens comprados
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {shoppingList.is_completed ? (
+            <Badge>
+              <CheckCircle2 className="mr-1 h-3 w-3" />
+              Completa
+            </Badge>
+          ) : (
+            <Badge variant="secondary">Em andamento</Badge>
+          )}
+          {shoppingList.is_auto_generated && (
+            <Badge variant="outline">Gerada automaticamente</Badge>
+          )}
+          <DebugButton listId={id} />
+        </div>
+      </div>
+
+      {/* Lista de Itens */}
+      <ShoppingListItems
+        items={shoppingList.shopping_list_items || []}
+        shoppingListId={id}
+        isAutoGenerated={shoppingList.is_auto_generated}
+      />
+
+    </div>
+  );
+}

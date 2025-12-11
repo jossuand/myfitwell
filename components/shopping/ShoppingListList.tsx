@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, CheckCircle2, Eye } from "lucide-react";
+import { ShoppingCart, CheckCircle2, Eye, Trash2, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 
 interface ShoppingList {
   id: string;
@@ -19,6 +22,33 @@ interface ShoppingListListProps {
 }
 
 export default function ShoppingListList({ lists }: ShoppingListListProps) {
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const supabase = createClient();
+  const router = useRouter();
+
+  const handleDeleteList = async (listId: string, listName: string) => {
+    if (!confirm(`Tem certeza que deseja excluir a lista "${listName}"? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    setDeletingId(listId);
+
+    try {
+      const { error } = await supabase
+        .from("shopping_lists")
+        .delete()
+        .eq("id", listId);
+
+      if (error) throw error;
+
+      router.refresh();
+    } catch (error) {
+      console.error("Erro ao excluir lista:", error);
+      alert("Erro ao excluir lista de compras");
+    } finally {
+      setDeletingId(null);
+    }
+  };
   if (lists.length === 0) {
     return (
       <Card>
@@ -36,7 +66,7 @@ export default function ShoppingListList({ lists }: ShoppingListListProps) {
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {lists.map((list) => {
+      {lists.filter(list => list && list.id).map((list) => {
         const totalItems = list.shopping_list_items?.length || 0;
         const purchasedItems =
           list.shopping_list_items?.filter((item) => item.is_purchased)
@@ -67,12 +97,27 @@ export default function ShoppingListList({ lists }: ShoppingListListProps) {
               <p className="text-sm">
                 {purchasedItems} de {totalItems} itens comprados
               </p>
-              <Button variant="outline" size="sm" asChild className="w-full">
-                <Link href={`/dashboard/shopping-lists/${list.id}`}>
-                  <Eye className="mr-2 h-4 w-4" />
-                  Ver Lista
+              <div className="flex gap-2">
+                <Link href={`/dashboard/shopping-lists/${list.id}`} className="flex-1">
+                  <Button variant="outline" size="sm" className="w-full">
+                    <Eye className="mr-2 h-4 w-4" />
+                    Ver Lista
+                  </Button>
                 </Link>
-              </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDeleteList(list.id, list.name)}
+                  disabled={deletingId === list.id}
+                  className="text-destructive hover:text-destructive"
+                >
+                  {deletingId === list.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         );
