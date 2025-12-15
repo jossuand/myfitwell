@@ -20,7 +20,11 @@ export default async function UserProductsPage() {
     .select(`
       *,
       product_base:product_bases(*),
-      measurement_unit:measurement_units(*)
+      measurement_unit:measurement_units(*),
+      user_nutritional_info:user_product_nutritional_info(
+        *,
+        reference_unit:measurement_units(*)
+      )
     `)
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
@@ -46,4 +50,3 @@ export default async function UserProductsPage() {
     </div>
   );
 }
-

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Warehouse, AlertTriangle, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
@@ -16,6 +16,7 @@ interface InventoryItem {
   expiration_date: string | null;
   storage_location: string | null;
   status: string;
+  product_base: { name: string } | null;
   user_product: {
     custom_name: string | null;
     product_base: { name: string } | null;
@@ -31,10 +32,12 @@ export default function InventoryList({ inventory }: InventoryListProps) {
   const supabase = createClient();
   const router = useRouter();
   const [userProducts, setUserProducts] = React.useState<any[]>([]);
+  const [productBases, setProductBases] = React.useState<any[]>([]);
   const [units, setUnits] = React.useState<any[]>([]);
   const [showForm, setShowForm] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [selectedProductId, setSelectedProductId] = React.useState<string | null>(null);
+  const [selectedProductKind, setSelectedProductKind] = React.useState<"user" | "base" | null>(null);
   const [unitId, setUnitId] = React.useState<string>("");
   const [quantity, setQuantity] = React.useState<string>("");
   const [expirationDate, setExpirationDate] = React.useState<string>("");
@@ -60,16 +63,21 @@ export default function InventoryList({ inventory }: InventoryListProps) {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
-      const [{ data: up }, { data: un }] = await Promise.all([
+      const [{ data: up }, { data: pb }, { data: un }] = await Promise.all([
         supabase
           .from("user_products")
-          .select("*, product_base:product_bases(*)")
+          .select("*, measurement_unit:measurement_units(id, abbreviation), product_base:product_bases(*, measurement_unit:measurement_units(id, abbreviation))")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false }),
+        supabase
+          .from("product_bases")
+          .select("*, measurement_unit:measurement_units(id, abbreviation)")
+          .order("name"),
         supabase.from("measurement_units").select("*").eq("is_active", true).order("name"),
       ]);
       if (!mounted) return;
       setUserProducts(up || []);
+      setProductBases(pb || []);
       setUnits(un || []);
     })();
     return () => {
@@ -97,23 +105,29 @@ export default function InventoryList({ inventory }: InventoryListProps) {
       alert("Usuário não autenticado");
       return;
     }
+    const payload: any = {
+      user_id: user.id,
+      measurement_unit_id: unitId,
+      quantity: parseFloat(quantity),
+      expiration_date: expirationDate || null,
+      storage_location: storageLocation || null,
+      status: status || "available",
+    };
+    if (selectedProductKind === "user") {
+      payload.user_product_id = selectedProductId;
+    } else if (selectedProductKind === "base") {
+      payload.product_base_id = selectedProductId;
+    }
     const { error: insertError } = await supabase
       .from("inventory")
-      .insert({
-        user_id: user.id,
-        user_product_id: selectedProductId,
-        measurement_unit_id: unitId,
-        quantity: parseFloat(quantity),
-        expiration_date: expirationDate || null,
-        storage_location: storageLocation || null,
-        status: status || "available",
-      });
+      .insert(payload);
     if (insertError) {
       alert(insertError.message);
       return;
     }
     setShowForm(false);
     setSelectedProductId(null);
+    setSelectedProductKind(null);
     setSearchTerm("");
     setUnitId("");
     setQuantity("");
@@ -152,35 +166,47 @@ export default function InventoryList({ inventory }: InventoryListProps) {
                     <Input
                       placeholder="Buscar produto..."
                       value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setSearchTerm(v);
+                        // se havia um produto selecionado e o usuário alterou/limpou o texto,
+                        // liberamos novamente a busca
+                        if (selectedProductId) {
+                          setSelectedProductId(null);
+                          setSelectedProductKind(null);
+                        }
+                      }}
                     />
                     {(() => {
                       const term = searchTerm.trim().toLowerCase();
                       if (selectedProductId || term.length === 0) return null;
-                      const options = userProducts
+                      const userOptions = (userProducts || [])
                         .filter((up) => {
                           const label = up.custom_name || up.product_base?.name || up.id;
-                          return label.toLowerCase().includes(term);
+                          return label?.toLowerCase().includes(term);
                         })
-                        .slice(0, 50);
+                        .map((up) => ({ id: up.id, label: up.custom_name || up.product_base?.name || up.id, kind: "user" as const, muId: up?.measurement_unit?.id || up?.product_base?.measurement_unit?.id || null }));
+                      const baseOptions = (productBases || [])
+                        .filter((pb) => pb.name?.toLowerCase().includes(term))
+                        .map((pb) => ({ id: pb.id, label: pb.name, kind: "base" as const, muId: pb?.measurement_unit?.id || null }));
+                      const options = [...baseOptions, ...userOptions].slice(0, 50);
                       return (
                         <div className="max-h-40 overflow-auto rounded border bg-background">
                           {options.length > 0 ? (
-                            options.map((up) => {
-                              const label = up.custom_name || up.product_base?.name || up.id;
-                              return (
-                                <button
-                                  key={up.id}
-                                  className="flex w-full cursor-pointer items-center justify-between px-2 py-1 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                                  onClick={() => {
-                                    setSelectedProductId(up.id);
-                                    setSearchTerm(label);
-                                  }}
-                                >
-                                  <span>{label}</span>
-                                </button>
-                              );
-                            })
+                            options.map((opt) => (
+                              <button
+                                key={`${opt.kind}-${opt.id}`}
+                                className="flex w-full cursor-pointer items-center justify-between px-2 py-1 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                                onClick={() => {
+                                  setSelectedProductId(opt.id);
+                                  setSelectedProductKind(opt.kind);
+                                  setSearchTerm(opt.label);
+                                  setUnitId(opt.muId || "");
+                                }}
+                              >
+                                <span>{opt.label}</span>
+                              </button>
+                            ))
                           ) : (
                             <div className="px-2 py-1 text-sm text-muted-foreground">Nenhum resultado</div>
                           )}
@@ -199,13 +225,17 @@ export default function InventoryList({ inventory }: InventoryListProps) {
                   />
                 </td>
                 <td className="p-2 align-top">
-                  <Select value={unitId} onChange={(e) => setUnitId(e.target.value)}>
-                    <option value="">Selecione...</option>
-                    {units.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.abbreviation}
-                      </option>
-                    ))}
+                  <Select value={unitId} onValueChange={(v) => setUnitId(v)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {units.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.abbreviation}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
                 </td>
                 <td className="p-2 align-top">
@@ -215,10 +245,15 @@ export default function InventoryList({ inventory }: InventoryListProps) {
                   <Input placeholder="Local" value={storageLocation} onChange={(e) => setStorageLocation(e.target.value)} />
                 </td>
                 <td className="p-2 align-top">
-                  <Select value={status} onChange={(e) => setStatus(e.target.value)}>
-                    <option value="available">Disponível</option>
-                    <option value="reserved">Reservado</option>
-                    <option value="expired">Vencido</option>
+                  <Select value={status} onValueChange={(v) => setStatus(v)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="available">Disponível</SelectItem>
+                      <SelectItem value="reserved">Reservado</SelectItem>
+                      <SelectItem value="expired">Vencido</SelectItem>
+                    </SelectContent>
                   </Select>
                 </td>
                 <td className="p-2 align-top">
@@ -261,6 +296,7 @@ export default function InventoryList({ inventory }: InventoryListProps) {
             {inventory.map((item) => {
               const productName =
                 item.user_product?.custom_name ||
+                item.product_base?.name ||
                 item.user_product?.product_base?.name ||
                 "Produto";
               const isExpiring =
@@ -349,14 +385,18 @@ export default function InventoryList({ inventory }: InventoryListProps) {
                         <div>
                           <Select
                             value={unitIdStr}
-                            onChange={(e) => setUnitIdEditByItem((p) => ({ ...p, [item.id]: e.target.value }))}
+                            onValueChange={(v) => setUnitIdEditByItem((p) => ({ ...p, [item.id]: v }))}
                           >
-                            <option value="">Selecione...</option>
-                            {units.map((u) => (
-                              <option key={u.id} value={u.id}>
-                                {u.abbreviation}
-                              </option>
-                            ))}
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Selecione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {units.map((u) => (
+                                <SelectItem key={u.id} value={u.id}>
+                                  {u.abbreviation}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
                           </Select>
                         </div>
                         <div>
@@ -376,11 +416,16 @@ export default function InventoryList({ inventory }: InventoryListProps) {
                         <div>
                           <Select
                             value={statusStr}
-                            onChange={(e) => setStatusEditByItem((p) => ({ ...p, [item.id]: e.target.value }))}
+                            onValueChange={(v) => setStatusEditByItem((p) => ({ ...p, [item.id]: v }))}
                           >
-                            <option value="available">Disponível</option>
-                            <option value="reserved">Reservado</option>
-                            <option value="expired">Vencido</option>
+                            <SelectTrigger className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="available">Disponível</SelectItem>
+                              <SelectItem value="reserved">Reservado</SelectItem>
+                              <SelectItem value="expired">Vencido</SelectItem>
+                            </SelectContent>
                           </Select>
                         </div>
                       </div>

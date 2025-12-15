@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
-import { DebugButton } from "@/components/shopping/DebugButton";
 import { ShoppingListItems } from "@/components/shopping/ShoppingListItems";
 
 interface ShoppingListPageProps {
@@ -147,7 +146,6 @@ export default async function ShoppingListPage({ params }: ShoppingListPageProps
           {shoppingList.is_auto_generated && (
             <Badge variant="outline">Gerada automaticamente</Badge>
           )}
-          <DebugButton listId={id} />
         </div>
       </div>
 

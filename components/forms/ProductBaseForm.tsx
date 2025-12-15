@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select } from "@/components/ui/select";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -41,6 +41,8 @@ export default function ProductBaseForm({
     register: registerProduct,
     handleSubmit: handleSubmitProduct,
     formState: { errors: productErrors },
+    watch: watchProduct,
+    setValue: setProductValue,
   } = useForm<ProductBaseInput>({
     resolver: zodResolver(productBaseSchema),
     defaultValues: product
@@ -53,6 +55,11 @@ export default function ProductBaseForm({
         }
       : {},
   });
+
+  React.useEffect(() => {
+    registerProduct("category_id");
+    registerProduct("measurement_unit_id");
+  }, [registerProduct]);
 
   const {
     register: registerNutrition,
@@ -229,28 +236,41 @@ export default function ProductBaseForm({
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="category_id">Categoria</Label>
-                  <Select id="category_id" {...registerProduct("category_id")}>
-                    <option value="">Selecione...</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
+                  <Select
+                    value={String(watchProduct("category_id") || "")}
+                    onValueChange={(v) => setProductValue("category_id", v === "none" ? ("" as any) : (v as any))}
+                  >
+                    <SelectTrigger id="category_id">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Selecione...</SelectItem>
+                      {categories.map((cat) => (
+                        <SelectItem key={cat.id} value={String(cat.id)}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="measurement_unit_id">Unidade de Medida</Label>
                   <Select
-                    id="measurement_unit_id"
-                    {...registerProduct("measurement_unit_id")}
+                    value={String(watchProduct("measurement_unit_id") || "")}
+                    onValueChange={(v) => setProductValue("measurement_unit_id", v === "none" ? ("" as any) : (v as any))}
                   >
-                    <option value="">Selecione...</option>
-                    {units.map((unit) => (
-                      <option key={unit.id} value={unit.id}>
-                        {unit.name} ({unit.abbreviation})
-                      </option>
-                    ))}
+                    <SelectTrigger id="measurement_unit_id">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Selecione...</SelectItem>
+                      {units.map((unit) => (
+                        <SelectItem key={unit.id} value={String(unit.id)}>
+                          {unit.name} ({unit.abbreviation})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
                 </div>
               </div>
@@ -354,4 +374,3 @@ export default function ProductBaseForm({
     </Card>
   );
 }
-

@@ -24,6 +24,33 @@ export default function BaseProductsCatalog({ products, defaultQuery }: BaseProd
     return products.filter((p) => (p?.name || "").toLowerCase().includes(t));
   }, [products, term]);
 
+  const handleToggle = async (product: any) => {
+    const next = !openById[product.id];
+    setOpenById((prev) => ({ ...prev, [product.id]: next }));
+    const hasLocal = !!(Array.isArray(product.nutritional_info)
+      ? product.nutritional_info[0]
+      : product.nutritional_info);
+    if (next && !hasLocal && !nutritionById[product.id]) {
+      const { data, error } = await supabase
+        .from("nutritional_info")
+        .select("*")
+        .eq("product_base_id", product.id)
+        .maybeSingle();
+      let row = data as any | null;
+      if (!row) {
+        const { data: rows } = await supabase
+          .from("nutritional_info")
+          .select("*")
+          .eq("product_base_id", product.id)
+          .limit(1);
+        row = rows && rows.length > 0 ? rows[0] : null;
+      }
+      if (row) {
+        setNutritionById((prev) => ({ ...prev, [product.id]: row }));
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
@@ -40,46 +67,22 @@ export default function BaseProductsCatalog({ products, defaultQuery }: BaseProd
       {filtered && filtered.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((product: any) => (
-            <Card key={product.id}>
+            <Card
+              key={product.id}
+              className="cursor-pointer"
+              onClick={() => handleToggle(product)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") handleToggle(product);
+              }}
+              tabIndex={0}
+            >
               <CardHeader>
-                <button
-                  className="w-full text-left"
-          onClick={() =>
-            (async () => {
-              const next = !openById[product.id];
-              setOpenById((prev) => ({ ...prev, [product.id]: next }));
-              const hasLocal = !!(Array.isArray(product.nutritional_info)
-                ? product.nutritional_info[0]
-                : product.nutritional_info);
-              if (next && !hasLocal && !nutritionById[product.id]) {
-                const { data, error } = await supabase
-                  .from("nutritional_info")
-                  .select("*")
-                  .eq("product_base_id", product.id)
-                  .maybeSingle();
-                let row = data as any | null;
-                if (!row) {
-                  const { data: rows } = await supabase
-                    .from("nutritional_info")
-                    .select("*")
-                    .eq("product_base_id", product.id)
-                    .limit(1);
-                  row = rows && rows.length > 0 ? rows[0] : null;
-                }
-                if (row) {
-                  setNutritionById((prev) => ({ ...prev, [product.id]: row }));
-                }
-              }
-            })()
-          }
-        >
-                  <CardTitle className="text-lg">{product.name}</CardTitle>
-                  {product.category && (
-                    <div className="mt-1">
-                      <Badge variant="secondary">{product.category.name}</Badge>
-                    </div>
-                  )}
-                </button>
+                <CardTitle className="text-lg">{product.name}</CardTitle>
+                {product.category && (
+                  <div className="mt-1">
+                    <Badge variant="secondary">{product.category.name}</Badge>
+                  </div>
+                )}
               </CardHeader>
               <CardContent className="space-y-3">
                 {product.measurement_unit && (

@@ -18,6 +18,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const clientNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -42,6 +44,7 @@ export default function Sidebar() {
   const router = useRouter();
   const supabase = createClient();
   const isAdmin = pathname.startsWith("/dashboard/admin");
+  const { user } = useAuth();
 
   const navItems = isAdmin ? adminNavItems : clientNavItems;
 
@@ -53,7 +56,7 @@ export default function Sidebar() {
 
   return (
     <div className="flex h-screen w-64 flex-col border-r bg-card">
-      <div className="flex h-16 items-center border-b px-6">
+      <div className="flex h-16 items-center px-6">
         <h1 className="text-xl font-bold text-primary">Myfitwell</h1>
       </div>
       <nav className="flex-1 space-y-1 p-4">
@@ -77,7 +80,30 @@ export default function Sidebar() {
           );
         })}
       </nav>
-      <div className="border-t p-4">
+      <div className="p-4 space-y-3">
+        {user ? (
+          <div className="flex items-center gap-3">
+            <Avatar>
+              <AvatarFallback>
+                {(user.user_metadata?.full_name || user.email || "U")
+                  .toString()
+                  .split(" ")
+                  .map((n: string) => n[0])
+                  .join("")
+                  .toUpperCase()
+                  .slice(0, 2)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">
+                {user.user_metadata?.full_name || "Usuário"}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">
+                {user.email}
+              </p>
+            </div>
+          </div>
+        ) : null}
         <Button
           variant="ghost"
           className="w-full justify-start"

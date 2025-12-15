@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
@@ -77,6 +77,12 @@ export default function UserProductForm({
   });
 
   const selectedBaseId = watch("product_base_id");
+
+  useEffect(() => {
+    register("product_base_id");
+    register("measurement_unit_id");
+    register("nutrition.reference_unit_id");
+  }, [register]);
 
   useEffect(() => {
     if (!selectedBaseId) return;
@@ -252,13 +258,21 @@ export default function UserProductForm({
 
           <div className="space-y-2">
             <Label htmlFor="product_base_id">Produto Base (opcional)</Label>
-            <Select id="product_base_id" {...register("product_base_id")}> 
-              <option value="">Sem produto base</option>
-              {productBases.map((pb) => (
-                <option key={pb.id} value={pb.id}>
-                  {pb.name}
-                </option>
-              ))}
+            <Select
+              value={String(watch("product_base_id") || "")}
+              onValueChange={(v) => setValue("product_base_id", v === "none" ? ("" as any) : (v as any))}
+            >
+              <SelectTrigger id="product_base_id">
+                <SelectValue placeholder="Sem produto base" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sem produto base</SelectItem>
+                {productBases.map((pb) => (
+                  <SelectItem key={pb.id} value={String(pb.id)}>
+                    {pb.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </div>
 
@@ -289,13 +303,21 @@ export default function UserProductForm({
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="measurement_unit_id">Unidade de Medida</Label>
-              <Select id="measurement_unit_id" {...register("measurement_unit_id")}>
-                <option value="">Selecione...</option>
-                {units.map((unit) => (
-                  <option key={unit.id} value={unit.id}>
-                    {unit.abbreviation}
-                  </option>
-                ))}
+              <Select
+                value={String(watch("measurement_unit_id") || "")}
+                onValueChange={(v) => setValue("measurement_unit_id", v === "none" ? ("" as any) : (v as any))}
+              >
+                <SelectTrigger id="measurement_unit_id">
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Selecione...</SelectItem>
+                  {units.map((unit) => (
+                    <SelectItem key={unit.id} value={String(unit.id)}>
+                      {unit.abbreviation}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
 
@@ -362,11 +384,21 @@ export default function UserProductForm({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="reference_unit_id">Unidade de referência</Label>
-                <Select id="reference_unit_id" {...register("nutrition.reference_unit_id")}>
-                  <option value="">Selecione...</option>
-                  {units.map((u) => (
-                    <option key={u.id} value={u.id}>{u.abbreviation}</option>
-                  ))}
+                <Select
+                  value={String(watch("nutrition.reference_unit_id") || "")}
+                  onValueChange={(v) => setValue("nutrition.reference_unit_id", v === "none" ? ("" as any) : (v as any))}
+                >
+                  <SelectTrigger id="reference_unit_id">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Selecione...</SelectItem>
+                    {units.map((u) => (
+                      <SelectItem key={u.id} value={String(u.id)}>
+                        {u.abbreviation}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">

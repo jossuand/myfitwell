@@ -19,6 +19,7 @@ export default async function InventoryPage() {
     .from("inventory")
     .select(`
       *,
+      product_base:product_bases(*),
       user_product:user_products(
         *,
         product_base:product_bases(*)

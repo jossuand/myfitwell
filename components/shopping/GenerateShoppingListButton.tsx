@@ -86,37 +86,8 @@ export function GenerateShoppingListButton() {
     }
   };
 
-  const testRLS = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        alert("Usuário não autenticado");
-        return;
-      }
-
-      const response = await fetch("/api/test-rls", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id }),
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        alert(`Teste RLS concluído:\n\nDiets: ${result.results.diets.success ? '✅ OK' : '❌ ' + result.results.diets.error}\nInsert: ${result.results.insert.success ? '✅ OK' : '❌ ' + result.results.insert.error}\nMeals: ${result.results.meals.success ? '✅ OK' : '❌ ' + result.results.meals.error}`);
-      } else {
-        alert(`Erro no teste RLS: ${result.error}`);
-      }
-    } catch (error: any) {
-      alert(`Erro ao testar RLS: ${error.message}`);
-    }
-  };
-
   return (
     <div className="flex gap-2">
-      <Button onClick={testRLS} variant="outline" size="sm">
-        Testar RLS
-      </Button>
       <Button onClick={handleGenerateList} disabled={isGenerating}>
         {isGenerating ? (
           <>
